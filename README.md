@@ -81,6 +81,10 @@ Run the release contract check with:
 The check rejects heap calls and HAL/RTOS/socket dependencies in the portable
 core. GitHub Actions builds with warnings as errors and runs the host tests.
 
+The STM32H563 reference integration, ThreadX/IT/DMA build matrix, W800 transport,
+and RS485 hardware acceptance evidence are maintained in
+[`l993889589/STM32`](https://github.com/l993889589/STM32/tree/codex/stm32h563-modbus/STM32H563_Modbus).
+
 ## Minimal server flow
 
 ```c

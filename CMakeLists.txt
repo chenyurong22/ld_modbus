@@ -11,7 +11,10 @@ add_library(ld_modbus STATIC
     src/ld_modbus_server.c
 )
 
-target_include_directories(ld_modbus PUBLIC include)
+target_include_directories(ld_modbus PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 target_compile_features(ld_modbus PUBLIC c_std_99)
 
 if(MSVC)
@@ -19,6 +22,17 @@ if(MSVC)
 else()
     target_compile_options(ld_modbus PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
+
+include(GNUInstallDirs)
+install(TARGETS ld_modbus EXPORT ld_modbusTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT ld_modbusTargets
+    FILE ld_modbusTargets.cmake
+    NAMESPACE ld_modbus::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ld_modbus
+)
 
 if(LD_MODBUS_BUILD_TESTS)
     enable_testing()
@@ -57,4 +71,3 @@ if(LD_MODBUS_BUILD_TESTS)
         add_test(NAME ld_modbus_ldc_all COMMAND ld_modbus_ldc_tests)
     endif()
 endif()
-

@@ -172,6 +172,124 @@ static void test_server_map(void)
     }
 }
 
+/** @brief Exercise every v0.1 function code and both address/value exceptions. */
+static void test_all_function_codes(void)
+{
+    uint8_t coils[16] = {1U, 0U, 1U, 0U};
+    uint8_t discrete[16] = {1U, 0U, 1U, 1U};
+    uint16_t holding[16] = {0U};
+    uint16_t input[16] = {0x1111U, 0x2222U};
+    ld_modbus_server_map_t map;
+    uint8_t response[LD_MODBUS_MAX_PDU_LENGTH];
+    uint8_t bits[4];
+    uint16_t registers[2];
+    uint8_t exception = 0U;
+    size_t response_length;
+
+    memset(&map, 0, sizeof(map));
+    map.coils = coils;
+    map.coils_count = 16U;
+    map.discrete_inputs = discrete;
+    map.discrete_inputs_count = 16U;
+    map.holding_registers = holding;
+    map.holding_registers_count = 16U;
+    map.input_registers = input;
+    map.input_registers_count = 16U;
+
+    {
+        const uint8_t request[] = {0x01U, 0U, 0U, 0U, 4U};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(ld_modbus_client_parse_read_bits_response(
+                   LD_MODBUS_FC_READ_COILS, 4U, response, response_length,
+                   bits, 4U, &exception) == LD_MODBUS_STATUS_OK);
+        assert(bits[0] == 1U && bits[1] == 0U && bits[2] == 1U);
+    }
+    {
+        const uint8_t request[] = {0x02U, 0U, 0U, 0U, 4U};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(ld_modbus_client_parse_read_bits_response(
+                   LD_MODBUS_FC_READ_DISCRETE_INPUTS, 4U, response, response_length,
+                   bits, 4U, &exception) == LD_MODBUS_STATUS_OK);
+        assert(bits[0] == 1U && bits[2] == 1U && bits[3] == 1U);
+    }
+    {
+        const uint8_t request[] = {0x04U, 0U, 0U, 0U, 2U};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(ld_modbus_client_parse_read_registers_response(
+                   LD_MODBUS_FC_READ_INPUT_REGISTERS, 2U, response, response_length,
+                   registers, 2U, &exception) == LD_MODBUS_STATUS_OK);
+        assert(registers[0] == 0x1111U && registers[1] == 0x2222U);
+    }
+    {
+        const uint8_t request[] = {0x05U, 0U, 1U, 0xFFU, 0U};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(coils[1] == 1U && memcmp(request, response, sizeof(request)) == 0);
+        assert(ld_modbus_client_parse_write_response(
+                   LD_MODBUS_FC_WRITE_SINGLE_COIL, 1U, 0xFF00U,
+                   response, response_length, &exception) == LD_MODBUS_STATUS_OK);
+    }
+    {
+        const uint8_t request[] = {0x0FU, 0U, 4U, 0U, 4U, 1U, 0x0DU};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(coils[4] == 1U && coils[5] == 0U && coils[6] == 1U && coils[7] == 1U);
+        assert(ld_modbus_client_parse_write_response(
+                   LD_MODBUS_FC_WRITE_MULTIPLE_COILS, 4U, 4U,
+                   response, response_length, &exception) == LD_MODBUS_STATUS_OK);
+    }
+    {
+        const uint8_t request[] = {0x10U, 0U, 6U, 0U, 2U, 4U,
+                                   0x12U, 0x34U, 0xABU, 0xCDU};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(holding[6] == 0x1234U && holding[7] == 0xABCDU);
+        assert(ld_modbus_client_parse_write_response(
+                   LD_MODBUS_FC_WRITE_MULTIPLE_REGISTERS, 6U, 2U,
+                   response, response_length, &exception) == LD_MODBUS_STATUS_OK);
+    }
+    {
+        const uint8_t request[] = {0x16U, 0U, 8U, 0x0FU, 0x0FU, 0U, 0x50U};
+        holding[8] = 0xAAAAU;
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(holding[8] == 0x0A5AU);
+        assert(ld_modbus_client_parse_mask_write_response(
+                   8U, 0x0F0FU, 0x0050U, response, response_length,
+                   &exception) == LD_MODBUS_STATUS_OK);
+    }
+    {
+        const uint8_t request[] = {0x17U, 0U, 9U, 0U, 2U, 0U, 9U, 0U, 2U,
+                                   4U, 0x12U, 0x34U, 0xABU, 0xCDU};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(ld_modbus_client_parse_read_registers_response(
+                   LD_MODBUS_FC_WRITE_READ_MULTIPLE_REGISTERS, 2U,
+                   response, response_length, registers, 2U,
+                   &exception) == LD_MODBUS_STATUS_OK);
+        assert(registers[0] == 0x1234U && registers[1] == 0xABCDU);
+    }
+    {
+        const uint8_t request[] = {0x03U, 0U, 0U, 0U, 0U};
+        assert(ld_modbus_server_process_pdu(&map, request, sizeof(request), response,
+                                            sizeof(response), &response_length) ==
+               LD_MODBUS_STATUS_OK);
+        assert(response[0] == 0x83U &&
+               response[1] == LD_MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
+    }
+}
+
 /** @brief Verify complete RTU/TCP server ADUs, routing, and broadcasts. */
 static void test_complete_adu_servers(void)
 {
@@ -244,6 +362,7 @@ int main(void)
     test_in_place_codec();
     test_client_helpers();
     test_server_map();
+    test_all_function_codes();
     test_complete_adu_servers();
     puts("ld_modbus tests passed");
     return 0;
