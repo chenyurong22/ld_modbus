@@ -8,6 +8,7 @@ set(LD_MODBUS_LDC_ROOT "" CACHE PATH "Optional directory containing ldc_easy.c a
 add_library(ld_modbus STATIC
     src/ld_modbus_client.c
     src/ld_modbus_core.c
+    src/ld_modbus_rtu_framer.c
     src/ld_modbus_server.c
 )
 
@@ -44,6 +45,19 @@ if(LD_MODBUS_BUILD_TESTS)
         target_compile_options(ld_modbus_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
     endif()
     add_test(NAME ld_modbus_all COMMAND ld_modbus_tests)
+
+    add_executable(ld_modbus_rtu_framer_tests
+        tests/test_ld_modbus_rtu_framer.c
+    )
+    target_link_libraries(ld_modbus_rtu_framer_tests PRIVATE ld_modbus)
+    if(MSVC)
+        target_compile_options(ld_modbus_rtu_framer_tests PRIVATE /W4 /WX)
+    else()
+        target_compile_options(ld_modbus_rtu_framer_tests PRIVATE
+            -Wall -Wextra -Wpedantic -Werror
+        )
+    endif()
+    add_test(NAME ld_modbus_rtu_framer_all COMMAND ld_modbus_rtu_framer_tests)
 
     if(LD_MODBUS_LDC_ROOT)
         add_library(ld_modbus_test_ldc STATIC

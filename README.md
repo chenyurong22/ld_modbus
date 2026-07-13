@@ -1,5 +1,8 @@
 # ld_modbus
 
+STM32H563 示例、原工程的 LDC 依赖关系及两个示例工程入口，见
+[`docs/STM32H563示例与LDC说明.md`](docs/STM32H563示例与LDC说明.md)。
+
 `ld_modbus` is a C99 Modbus protocol stack for microcontrollers and other
 resource-constrained systems.
 
@@ -10,6 +13,7 @@ The v0.1 development baseline provides:
 - client and server roles;
 - transport, operating-system, and MCU independence;
 - bounded buffers and explicit error results;
+- optional platform-independent RTU T1.5/T3.5 receive framing;
 - host tests for valid, malformed, boundary, and interoperability vectors.
 
 ## Memory contract
@@ -21,9 +25,9 @@ to the application.
 ## Layering
 
 ```text
-UART DMA / TCP socket
+UART DMA / interrupt timestamps / TCP socket
         |
-optional LDC framing adapter
+optional RTU framer or LDC adapter
         |
 RTU or TCP ADU codec
         |
@@ -34,6 +38,13 @@ application-owned register map
 
 LDC is an optional framing integration. The portable Modbus core can also be
 used with any transport that supplies a complete RTU or TCP ADU.
+
+`ld_modbus_rtu_framer` is the strict RTU receive helper shipped with the
+library. It implements T1.5 rejection and T3.5 frame completion without HAL,
+UART, timer, RTOS, or LDC dependencies. A platform port supplies each received
+byte with an end-of-character microsecond timestamp and calls the poll API with
+the same wrapping clock. The RTU/TCP codec and client/server core do not depend
+on this optional helper.
 
 To build the optional adapter tests, point CMake at a directory containing
 `ldc_easy.c`, `ldc_core.c`, `ldc_packet.c`, `ldc_ring.c`, and their headers:
@@ -70,7 +81,8 @@ fallback:
 The current implementation contains complete RTU/TCP ADU codecs, common client
 request builders and response parsers, complete-ADU server entry points, RTU
 broadcast/unit handling, and a static server map for function codes 01, 02,
-03, 04, 05, 06, 0F, 10, 16, and 17.
+03, 04, 05, 06, 0F, 10, 16, and 17. The distribution also contains a static,
+platform-independent RTU T1.5/T3.5 framer.
 
 Run the release contract check with:
 
